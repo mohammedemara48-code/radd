@@ -41,14 +41,29 @@ class LaunchTest {
 
     @Test fun resultsShowAnHonestEmptyStateBeforeAnyScan() {
         go(Route.RESULTS)
-        see("مفيش صور اتلقت")
-        see("لو الصورة اتمسحت نهائي من غير أثر")
+        see("ملقيناش صور ممسوحة")
+        see("مفيش أثر لصور ممسوحة")
+    }
+
+    @Test fun homeExplainsInPlainWordsThatItLooksForDeletedPhotosOnly() {
+        see("بيدوّر على الصور اللي انت مسحتها بس، مش الصور اللي لسه عندك")
+        see("إزاي بيشتغل")
+        see("بيشيل اللي لسه عندك")
+    }
+
+    @Test fun resultsAreGroupedBySourceWithAHeaderForEach() {
+        seedResults(14)
+        go(Route.RESULTS)
+        see("سلة المحذوفات")
+        see("اتمسحت من المعرض وفاضلة في سلة المحذوفات")
+        see("LOST.DIR")
+        see("بقايا ملفات لقيناها بعد خطأ في الذاكرة")
     }
 
     @Test fun resultsGridPreviewAndBack() {
         seedResults(12)
         go(Route.RESULTS)
-        see("12 صورة قابلة للاسترجاع")
+        see("12 صورة ممسوحة لقيناها")
         see("ظاهر 12 من 12")
         // open the first photo in the full viewer
         val first = runBlocking { graph.db.found().count() }
@@ -57,13 +72,13 @@ class LaunchTest {
         see("استرجع الصورة دي")
         see("المسار الأصلي")
         go(Route.RESULTS)
-        see("12 صورة قابلة للاسترجاع")
+        see("12 صورة ممسوحة لقيناها")
     }
 
     @Test fun selectingPhotosShowsTheRestoreBar() {
         seedResults(6)
         go(Route.RESULTS)
-        see("6 صورة قابلة للاسترجاع")
+        see("6 صورة ممسوحة لقيناها")
         rule.runOnUiThread { results.toggle(1); results.toggle(2) }
         see("2 محددة")
         see("استرجاع")
@@ -74,7 +89,7 @@ class LaunchTest {
     @Test fun restoringFromTheUiEndsOnTheDoneScreenAndWritesTheFiles() {
         seedResults(3)
         go(Route.RESULTS)
-        see("3 صورة قابلة للاسترجاع")
+        see("3 صورة ممسوحة لقيناها")
         rule.runOnUiThread { results.toggle(1); results.toggle(2); results.restore() }
         rule.waitFor("done screen") { nav.route == Route.DONE }
         see("اتسترجعت 2 صور")
@@ -113,8 +128,8 @@ class LaunchTest {
 
     @Test fun aRealScanOfTheSandboxStorageFindsPhotosAndLandsOnResults() {
         val root = android.os.Environment.getExternalStorageDirectory()
-        Fixtures.write(java.io.File(root, "DCIM/.thumbnails/.thumbdata3--1"), Fixtures.jpeg(1, 100, 80), Fixtures.junk(200), Fixtures.jpeg(2, 100, 80))
-        Fixtures.write(java.io.File(root, "DCIM/Camera/.trashed-1763900000-IMG_9.jpg"), Fixtures.jpeg(3, 200, 150))
+        Fixtures.write(java.io.File(root, "DCIM/.thumbnails/.thumbdata3--1"), Fixtures.thumb(9), Fixtures.junk(200), Fixtures.thumb(1))
+        Fixtures.write(java.io.File(root, "DCIM/Camera/.trashed-1763900000-IMG_9.jpg"), Fixtures.scene(4))
         runBlocking { graph.controller.run() }
         val st = graph.controller.state.value
         assertTrue("state was $st", st is app.radd.vm.ScanState.Finished)

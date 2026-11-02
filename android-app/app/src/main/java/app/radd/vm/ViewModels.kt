@@ -95,6 +95,7 @@ sealed interface ResultsUi {
         val filters: Filters,
         val selected: Set<Long>,
         val scanning: Boolean,
+        val summary: ScanSummary? = null,
     ) : ResultsUi
 }
 
@@ -122,7 +123,8 @@ class ResultsViewModel(
         r.fold(
             onSuccess = { items ->
                 val ids = items.mapTo(HashSet()) { it.id }
-                ResultsUi.Ready(items, f.apply(items, clock()), f, sel.filterTo(HashSet()) { it in ids }, scan is ScanState.Running)
+                ResultsUi.Ready(items, f.apply(items, clock()), f, sel.filterTo(HashSet()) { it in ids }, scan is ScanState.Running,
+                    (scan as? ScanState.Finished)?.let { ScanSummary(it.stillVisible, it.excluded) })
             },
             onFailure = { ResultsUi.Failed(it.message ?: it.javaClass.simpleName) },
         )

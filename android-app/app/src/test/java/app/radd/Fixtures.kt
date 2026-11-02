@@ -69,4 +69,51 @@ object Fixtures {
         file.outputStream().use { o -> parts.forEach { o.write(it) } }
         return file
     }
+
+    // ---- scene photos (see tools/make_fixtures.py) --------------------------------------------------------------------
+
+    /** A fixture file by name. [seed] != 0 adds a comment segment, which changes the bytes but not the picture. */
+    fun named(name: String, seed: Int = 0): ByteArray {
+        val base = resource(name)
+        if (seed == 0 || !name.endsWith(".jpg")) return base
+        val text = "radd-fixture-$seed".toByteArray()
+        val com = byteArrayOf(0xff.toByte(), 0xfe.toByte(), 0, (text.size + 2).toByte()) + text
+        return base.copyOfRange(0, 2) + com + base.copyOfRange(2, base.size)
+    }
+
+    /** Scene [n] (1..12): 720x480 camera-style JPEG; 1..10 carry camera EXIF, 11 and 12 do not. */
+    fun scene(n: Int, seed: Int = 0) = named("scene_%02d.jpg".format(n), seed)
+
+    /** The WhatsApp-style copy (480x320, recompressed, no EXIF). Exists for scenes 1, 2, 3, 7, 8. */
+    fun waCopy(n: Int, seed: Int = 0) = named("scene_%02d_wa.jpg".format(n), seed)
+
+    /** The gallery-cache thumbnail (384x256). Exists for scenes 1, 2, 4, 7, 9. */
+    fun thumb(n: Int, seed: Int = 0) = named("scene_%02d_thumb.jpg".format(n), seed)
+
+    /** The same bytes with the fixture comment removed, so a copy made with a seed has the same identity as the original. */
+    private fun canonical(bytes: ByteArray): ByteArray {
+        if (bytes.size > 4 && bytes[2] == 0xff.toByte() && bytes[3] == 0xfe.toByte()) {
+            val len = ((bytes[4].toInt() and 0xff) shl 8) or (bytes[5].toInt() and 0xff)
+            if (String(bytes, 6, minOf(len - 2, bytes.size - 6)).startsWith("radd-fixture-")) return bytes.copyOfRange(0, 2) + bytes.copyOfRange(4 + len, bytes.size)
+        }
+        return bytes
+    }
+
+    fun sha(bytes: ByteArray) = java.security.MessageDigest.getInstance("SHA-256").digest(bytes).joinToString("") { "%02x".format(it) }
+
+    private val prints: Map<String, app.radd.engine.Fingerprint> by lazy {
+        String(resource("fingerprints.tsv")).lineSequence().filter { it.isNotBlank() }.associate { line ->
+            val p = line.split('\t')
+            p[0] to app.radd.engine.Fingerprint(p[2].toInt(), p[3].toInt(), java.lang.Long.parseUnsignedLong(p[4]), java.lang.Long.parseUnsignedLong(p[5]), p[6].toInt())
+        }
+    }
+
+    /** Signature of a fixture, made by the Python script with the same algorithm as the app (a phone decodes JPEGs; the JVM cannot). */
+    fun printOf(bytes: ByteArray): app.radd.engine.Fingerprint? = prints[sha(canonical(bytes))]
+
+    /** Looks signatures up by file content, like [app.radd.engine.Fingerprinter] would compute them on a phone. */
+    val fingerprinter = app.radd.engine.Fingerprinter { file, offset, length ->
+        val bytes = file.inputStream().use { it.skip(offset); it.readNBytes(length.toInt()) }
+        printOf(bytes)
+    }
 }

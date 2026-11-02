@@ -7,6 +7,7 @@ import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.items
@@ -48,9 +49,11 @@ fun ResultsScreen(
     onBack: () -> Unit = {},
     scanning: Boolean = false,
     onNewScan: () -> Unit = {},
+    summary: ScanSummary? = null,
 ) {
     val selecting = selected.isNotEmpty()
     val intact = all.count { it.quality == Quality.INTACT }
+    val groups = Source.entries.mapNotNull { s -> shown.filter { it.source == s }.takeIf { it.isNotEmpty() }?.let { s to it } }
     Column(modifier.fillMaxSize()) {
         // Top bar: normal or selection mode
         if (selecting) {
@@ -63,14 +66,18 @@ fun ResultsScreen(
             Row(Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
                 IconButton(onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "رجوع") }
                 Column(Modifier.weight(1f)) {
-                    Text("${all.size} صورة قابلة للاسترجاع", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+                    Text(if (all.isEmpty()) "النتايج" else "${all.size} صورة ممسوحة لقيناها", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
                 }
             }
         }
+        if (all.isNotEmpty()) {
         Text(
             "$intact سليمة · ${all.size - intact} ناقصة (الجزء الرمادي هو اللي ضاع)",
             Modifier.padding(horizontal = 20.dp), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
+        summary?.takeIf { it.hasNumbers }?.let {
+            Text(it.sentence(), Modifier.padding(horizontal = 20.dp, vertical = 2.dp), style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary)
+        }
         Spacer(Modifier.height(8.dp))
 
         CompositionLocalProvider(LocalMinimumInteractiveComponentSize provides 40.dp) {
@@ -111,15 +118,18 @@ fun ResultsScreen(
             Text("ظاهر ${shown.size} من ${all.size}", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.weight(1f))
             if (filters.activeCount > 0) TextButton({ onFilters(Filters(sort = filters.sort)) }) { Text("مسح الفلاتر (${filters.activeCount})") }
         }
+        }
 
         if (scanning) {
             Text("الفحص لسه شغال، النتايج بتزيد. ", Modifier.padding(horizontal = 20.dp), style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary)
         }
         if (all.isEmpty()) {
             EmptyState(
-                title = if (scanning) "لسه ملقيناش حاجة" else "مفيش صور اتلقت",
-                body = if (scanning) "الفحص شغال. أول ما يلاقي حاجة هتظهر هنا." else "ردّ مبيلاقيش غير اللي لسه ليه أثر (سلة المحذوفات، LOST.DIR، المصغّرات، كاش الشات). لو الصورة اتمسحت نهائي من غير أثر، مش هتظهر، وده حد من حدود التطبيق مش خطأ.",
-                actionLabel = if (scanning) null else "فحص جديد", onAction = onNewScan, modifier = Modifier.weight(1f),
+                title = if (scanning) "لسه ملقيناش حاجة" else "ملقيناش صور ممسوحة",
+                body = if (scanning) "الفحص شغال. أول ما يلاقي حاجة هتظهر هنا." else
+                    "مفيش أثر لصور ممسوحة في الأماكن اللي بندوّر فيها. ده معناه غالبًا إن الصور اتمسحت نهائي، أو إنها لسه عندك. " +
+                        (summary?.takeIf { it.hasNumbers }?.sentence() ?: ""),
+                actionLabel = if (scanning) null else "رجوع", onAction = onNewScan, modifier = Modifier.weight(1f),
             )
         } else if (shown.isEmpty()) {
             EmptyState("مفيش نتايج بالفلاتر دي", "جرّب تمسح الفلاتر أو تغيّر الحجم أو التاريخ.", "مسح الفلاتر", { onFilters(Filters(sort = filters.sort)) }, Modifier.weight(1f))
@@ -130,7 +140,9 @@ fun ResultsScreen(
             contentPadding = PaddingValues(start = 4.dp, end = 4.dp, bottom = 8.dp),
             horizontalArrangement = Arrangement.spacedBy(3.dp), verticalArrangement = Arrangement.spacedBy(3.dp),
         ) {
-            items(shown, key = { it.id }) { item ->
+            groups.forEach { (source, list) ->
+            item(key = "header-${source.name}", span = { GridItemSpan(maxLineSpan) }) { SourceHeader(source, list.size) }
+            items(list, key = { it.id }) { item ->
                 val isSel = item.id in selected
                 Box(
                     Modifier.aspectRatio(1f).combinedClickable(
@@ -148,6 +160,7 @@ fun ResultsScreen(
                     SourceBadge(item.source, Modifier.align(Alignment.BottomStart).padding(start = inset + 4.dp, bottom = inset + 4.dp))
                     if (item.quality == Quality.PARTIAL) QualityTag(item.quality, Modifier.align(Alignment.BottomEnd).padding(end = inset + 4.dp, bottom = inset + 4.dp))
                 }
+            }
             }
         }
 
@@ -181,5 +194,19 @@ private fun DropChip(label: String, active: Boolean, value: String, options: Lis
         DropdownMenu(open, { open = false }) {
             options.forEach { (text, action) -> DropdownMenuItem(text = { Text(text) }, onClick = { open = false; action() }) }
         }
+    }
+}
+
+@Composable
+private fun SourceHeader(source: Source, count: Int) {
+    Column(Modifier.fillMaxWidth().padding(start = 12.dp, end = 12.dp, top = 14.dp, bottom = 4.dp)) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Icon(source.icon, null, Modifier.size(18.dp), tint = MaterialTheme.colorScheme.primary)
+            Spacer(Modifier.width(8.dp))
+            Text(source.label, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
+            Spacer(Modifier.width(8.dp))
+            Text("$count", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary)
+        }
+        Text(source.hint, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
     }
 }

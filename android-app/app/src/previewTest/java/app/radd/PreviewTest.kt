@@ -76,6 +76,10 @@ class PreviewTest {
         ResultsScreen(SampleItems, shown, filters, picked, thumb, {}, {}, {}, {}, {}, {})
     }
 
+    @Test fun emptyResults(): Unit = shot("6_results_empty_ar") {
+        ResultsScreen(emptyList(), emptyList(), Filters(), emptySet(), thumb, {}, {}, {}, {}, {}, {}, summary = ScanSummary(stillVisible = 4_212, excluded = 1_930))
+    }
+
     @Test fun fullPreview(): Unit = shot("4_full_preview_ar", bg = Color(0xFF0B100E)) {
         val item = SampleItems.first { it.source == Source.WHATSAPP && it.quality == Quality.INTACT && it.height > it.width && it.sizeBytes > 600 * 1024 }
         PhotoPreviewScreen(item, 3, 47, selected = false, thumb, {}, {}, {})

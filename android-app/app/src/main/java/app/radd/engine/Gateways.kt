@@ -2,8 +2,8 @@ package app.radd.engine
 
 import java.io.File
 
-/** A row from MediaStore (path, size, last modified in ms). */
-data class MediaRow(val path: String, val size: Long, val modifiedMs: Long)
+/** A row from MediaStore (path, size, last modified in ms; width and height are 0 when unknown). */
+data class MediaRow(val path: String, val size: Long, val modifiedMs: Long, val width: Int = 0, val height: Int = 0)
 
 /** What the system's media index knows. Failing to read it must never stop the scan, so errors are reported, not thrown. */
 interface MediaGateway {

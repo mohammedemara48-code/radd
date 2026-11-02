@@ -47,7 +47,7 @@ fun HomeScreen(
                     Text("هات صورك اللي اتمسحت", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onPrimaryContainer)
                     Spacer(Modifier.height(6.dp))
                     Text(
-                        "بيدوّر جوه موبايلك على الصور اللي لسه ليها أثر، من غير إنترنت.",
+                        "بيدوّر على الصور اللي انت مسحتها بس، مش الصور اللي لسه عندك. من غير إنترنت.",
                         style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onPrimaryContainer,
                     )
                 }
@@ -93,8 +93,19 @@ fun HomeScreen(
             }
         }
 
+        // What it does, in plain words
+        Section("إزاي بيشتغل") {
+            Surface(shape = RoundedCornerShape(20.dp), color = MaterialTheme.colorScheme.surfaceContainerLowest, modifier = Modifier.border(1.dp, MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(20.dp))) {
+                Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    HowStep(1, "بيدوّر على الأثر", "في سلة المحذوفات، والمجلدات المخفية، وبقايا الصور المصغّرة، وصور واتساب وتيليجرام.")
+                    HowStep(2, "بيشيل اللي لسه عندك", "أي صورة لسه موجودة في المعرض مش هتظهر. وكمان الأيقونات والملصقات والصور الصغيرة بتاعة التطبيقات.")
+                    HowStep(3, "بيعرضلك اللي اتمسح بس", "متقسّم حسب المكان اللي اتلقى فيه، وانت اللي تختار ترجّع إيه.")
+                }
+            }
+        }
+
         // Sources
-        Section("هيدوّر فين") {
+        Section("الأماكن اللي بيدوّر فيها") {
             FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                 listOf(Source.TRASH, Source.WHATSAPP, Source.TELEGRAM, Source.THUMBNAILS, Source.LOST_DIR, Source.HIDDEN, Source.CARVED).forEach {
                     InfoChip(it.label, it.icon)
@@ -104,10 +115,24 @@ fun HomeScreen(
 
         HonestNote(
             "الصراحة قبل ما تبدأ",
-            "ردّ مش بيقرا قطاعات الفلاش اللي اتمسحت فعلاً (ده محتاج روت). بيلاقي بس اللي لسه ليه أثر، فمفيش ضمان لكل صورة.",
+            "ردّ مش بيقرا قطاعات الفلاش اللي اتمسحت فعلاً (ده محتاج روت). بيلاقي بس اللي لسه ليه أثر. الطبيعي تلاقي كام صورة لحد كام عشرة، مش آلاف. ولو مفيش حاجة هيقولك بوضوح إنه ملقاش.",
         )
 
         Spacer(Modifier.height(2.dp))
+    }
+}
+
+@Composable
+private fun HowStep(n: Int, title: String, body: String) {
+    Row(verticalAlignment = Alignment.Top) {
+        Box(Modifier.size(28.dp).background(MaterialTheme.colorScheme.primaryContainer, CircleShape), contentAlignment = Alignment.Center) {
+            Text("$n", style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onPrimaryContainer)
+        }
+        Spacer(Modifier.width(12.dp))
+        Column(Modifier.weight(1f)) {
+            Text(title, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
+            Text(body, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
     }
 }
 

@@ -15,6 +15,8 @@ open class RaddApp : Application() {
 
     override fun onCreate() {
         super.onCreate()
+        // results saved by an older version were made with older rules; they must not show up as if they were real
+        ResultsFormat.migrate(this, databaseName)
         Graph.of(this).crashLog.install()
     }
 }
@@ -29,7 +31,7 @@ class Graph private constructor(val context: Context, databaseName: String) {
     val crashLog by lazy { CrashLog(context) }
     val restoreEngine by lazy { RestoreEngine(AndroidNotifier(context)) }
     val controller: ScanController by lazy {
-        ScanController(db) { ScanEngine(roots, AndroidMedia(context), AndroidDecodeCheck()) }
+        ScanController(db) { ScanEngine(roots, AndroidMedia(context), AndroidDecodeCheck(), AndroidFingerprinter()) }
     }
 
     /** `…/RaddRecovered` on the primary storage volume. */
@@ -52,5 +54,24 @@ class Graph private constructor(val context: Context, databaseName: String) {
                 else Graph(app, (app as? RaddApp)?.databaseName ?: RaddDatabase.NAME).also { instance = it }
             }
         }
+    }
+}
+
+/**
+ * Version of the rules that produced the saved results. When it changes (an upgrade with better rules), the saved results
+ * are deleted, because they cannot be trusted any more. Runs before the database is opened.
+ */
+object ResultsFormat {
+    const val CURRENT = 2
+    private const val PREFS = "radd_state"
+    private const val KEY = "results_format"
+
+    /** Returns true when old results were deleted. */
+    fun migrate(context: Context, databaseName: String): Boolean {
+        val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+        if (prefs.getInt(KEY, 0) == CURRENT) return false
+        val deleted = try { context.deleteDatabase(databaseName) } catch (_: Exception) { false }
+        prefs.edit().putInt(KEY, CURRENT).commit()
+        return deleted
     }
 }

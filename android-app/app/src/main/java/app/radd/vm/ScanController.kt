@@ -58,7 +58,7 @@ class ScanController(
                 when (e) {
                     is ScanEvent.Finished -> {
                         flush()
-                        _state.value = ScanState.Finished(e.found, e.unreadable, e.stillVisible, e.warnings)
+                        _state.value = ScanState.Finished(e.found, e.unreadable, e.stillVisible, e.warnings, e.excluded)
                     }
                     is ScanEvent.StageStarted, is ScanEvent.StageDone -> { lastPublish = now; _state.value = ScanState.Running(tracker.snapshot(now)) }
                     else -> if (now - lastPublish >= 150) { lastPublish = now; _state.value = ScanState.Running(tracker.snapshot(now)) }

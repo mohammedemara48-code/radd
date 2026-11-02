@@ -4,14 +4,27 @@ import java.time.Instant
 import java.time.ZoneId
 
 /** Where a recoverable photo was found. Every source is a place that really keeps traces on a normal, un-rooted phone. */
-enum class Source(val label: String) {
-    TRASH("سلة المحذوفات"),
-    LOST_DIR("LOST.DIR"),
-    THUMBNAILS("المصغّرات"),
-    WHATSAPP("واتساب"),
-    TELEGRAM("تيليجرام"),
-    HIDDEN("مخفية"),
-    CARVED("من الكاش"),
+enum class Source(val label: String, val hint: String) {
+    TRASH("سلة المحذوفات", "اتمسحت من المعرض وفاضلة في سلة المحذوفات."),
+    LOST_DIR("LOST.DIR", "بقايا ملفات لقيناها بعد خطأ في الذاكرة."),
+    THUMBNAILS("المصغّرات", "نسخ مصغّرة، والصورة الأصلية بتاعتها مش في المعرض."),
+    WHATSAPP("واتساب", "صور واتساب مش موجودة في المعرض."),
+    TELEGRAM("تيليجرام", "صور تيليجرام مش موجودة في المعرض."),
+    HIDDEN("مخفية", "صور في مجلدات مخفية، شكلها صور كاميرا."),
+    CARVED("من الكاش", "صور لقيناها جوه ملفات مؤقتة، شكلها صور كاميرا."),
+}
+
+/** What the last scan left out, so an empty or short list can be explained instead of looking like a bug. */
+data class ScanSummary(val stillVisible: Int, val excluded: Int) {
+    val hasNumbers: Boolean get() = stillVisible > 0 || excluded > 0
+
+    fun sentence(): String = buildString {
+        append("استبعدنا")
+        if (stillVisible > 0) append(" $stillVisible صورة لسه موجودة عندك")
+        if (stillVisible > 0 && excluded > 0) append(" و")
+        if (excluded > 0) append(" $excluded صورة صغيرة أو أيقونة أو بتاعة تطبيقات")
+        append(".")
+    }
 }
 
 /** INTACT: the file decodes end to end. PARTIAL: the header is valid but data is missing (often a grey band at the bottom). */

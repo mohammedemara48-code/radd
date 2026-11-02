@@ -28,8 +28,8 @@ class ScanControllerTest {
 
     private fun tree(): File {
         val root = tmp.newFolder("s")
-        Fixtures.write(File(root, "LOST.DIR/#1"), Fixtures.jpeg(1, 200, 150))
-        Fixtures.write(File(root, "DCIM/.thumbnails/.thumbdata3--1"), Fixtures.jpeg(2, 100, 80), Fixtures.junk(200), Fixtures.jpeg(3, 100, 80))
+        Fixtures.write(File(root, "LOST.DIR/#1"), Fixtures.scene(4))
+        Fixtures.write(File(root, "DCIM/.thumbnails/.thumbdata3--1"), Fixtures.thumb(9), Fixtures.junk(200), Fixtures.thumb(1))
         return root
     }
 
@@ -79,7 +79,7 @@ class ScanControllerTest {
     @Test fun cancellingMarksTheScanCancelledAndKeepsPartialResults() {
         val db = db()
         val root = tmp.newFolder("big")
-        repeat(400) { Fixtures.write(File(root, "Pictures/.p/i$it.jpg"), Fixtures.jpeg(it, 100, 80)) }
+        repeat(400) { Fixtures.write(File(root, "Pictures/.p/i$it.jpg"), Fixtures.scene(3 + it % 3, it + 1)) }
         val c = ScanController(db) { ScanEngine(StorageRoots { listOf(root) }) }
         runBlocking {
             val job = launch(Dispatchers.Default) { c.run() }

@@ -119,7 +119,7 @@ fun AppRoot(onGrant: () -> Unit, onNeedNotifications: () -> Unit) {
                     onOpen = { results.openPreview(it.id); nav.go(Route.PREVIEW) },
                     onToggle = { results.toggle(it.id) },
                     onSelectAll = results::selectAll, onClearSelection = results::clearSelection, onRestore = { results.restore() },
-                    onBack = { nav.go(Route.HOME) }, scanning = ui.scanning, onNewScan = { nav.go(Route.HOME) },
+                    onBack = { nav.go(Route.HOME) }, scanning = ui.scanning, onNewScan = { nav.go(Route.HOME) }, summary = ui.summary,
                 )
             }
 

@@ -45,4 +45,16 @@ class ProgressTrackerTest {
         assertEquals(8, t.snapshot(0).found)
         assertEquals(STAGES.size, t.snapshot(0).stages.size)
     }
+
+    @Test fun comparingWithTheGalleryIsShownAsTheCurrentStep() {
+        val t = ProgressTracker(0)
+        t.apply(ScanEvent.Comparing(250, 1_000))
+        assertTrue(t.snapshot(1).currentPath.contains("250") && t.snapshot(1).currentPath.contains("1000"))
+    }
+
+    @Test fun theSummarySentenceNamesWhatWasLeftOut() {
+        assertEquals("استبعدنا 12 صورة لسه موجودة عندك و 3 صورة صغيرة أو أيقونة أو بتاعة تطبيقات.", app.radd.model.ScanSummary(12, 3).sentence())
+        assertEquals("استبعدنا 12 صورة لسه موجودة عندك.", app.radd.model.ScanSummary(12, 0).sentence())
+        assertFalse(app.radd.model.ScanSummary(0, 0).hasNumbers)
+    }
 }

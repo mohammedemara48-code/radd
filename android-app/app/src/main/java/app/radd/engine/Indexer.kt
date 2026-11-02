@@ -24,10 +24,13 @@ object Classifier {
     private val MESSENGER_SKIP_DIRS = setOf(
         "whatsapp video", "whatsapp audio", "whatsapp voice notes", "whatsapp documents", "whatsapp animated gifs", "whatsapp stickers",
         "backups", "databases", "telegram video", "telegram audio", "telegram documents", "telegram files",
+        // pictures the user still has in a chat, other people's statuses, profile pictures and stickers are not "deleted photos"
+        "private", ".statuses", "whatsapp profile photos", "whatsapp stickers", "whatsapp business stickers", "telegram stickers",
+        "profile pictures", "wallpaper",
     )
-    const val MIN_COMPLETE = 4 * 1024L
-    const val MIN_THUMB = 2 * 1024L
-    const val MIN_PARTIAL = 8 * 1024L
+    const val MIN_COMPLETE = PhotoRules.MIN_BYTES
+    const val MIN_THUMB = PhotoRules.MIN_THUMB_BYTES
+    const val MIN_PARTIAL = PhotoRules.MIN_BYTES
 
     fun extension(name: String): String {
         val dot = name.lastIndexOf('.')
@@ -45,9 +48,12 @@ object Classifier {
         var messenger = parent?.messenger
         var hidden = parent?.hidden ?: false
         var skip = parent?.skip ?: false
+        val marker = name in TRASH_DIRS || name == "lost.dir" || name in THUMB_DIRS
         if (name in TRASH_DIRS) trash = true
         if (name == "lost.dir") lost = true
         if (name in THUMB_DIRS) thumbs = true
+        // Android/<anything but media> is private app storage; Android/media/<app> only counts for the two chat apps
+        if (segments.size == 2 && segments[0] == "android" && name != "media") skip = true
         if (messenger == null) {
             if (segments.size == 3 && segments[0] == "android" && segments[1] == "media") {
                 if (name == "com.whatsapp" || name == "com.whatsapp.w4b") messenger = Source.WHATSAPP
@@ -56,7 +62,10 @@ object Classifier {
             if (segments.size == 1 && name == "whatsapp") messenger = Source.WHATSAPP
             if (segments.size == 1 && name == "telegram") messenger = Source.TELEGRAM
         }
-        if (messenger != null && name in MESSENGER_SKIP_DIRS) skip = true
+        if (segments.size == 3 && segments[0] == "android" && segments[1] == "media" && messenger == null) skip = true
+        if (messenger != null && (name in MESSENGER_SKIP_DIRS || (hasNoMedia && segments.size > 1 && !(segments[0] == "android" && segments.size <= 3)))) skip = true
+        // other apps' icon, sticker, cache and package-named folders are app assets, not photos
+        if (messenger == null && !marker && AppAssets.isAssetDir(name)) skip = true
         if (name.startsWith(".") && name.length > 1 && !trash && !lost && !thumbs) hidden = hidden || messenger == null
         if (hasNoMedia && messenger == null) hidden = true
         return DirKind(trash, lost, thumbs, messenger, hidden, skip)
@@ -67,8 +76,9 @@ object Classifier {
         val lower = name.lowercase()
         val ext = extension(lower)
         if (size <= 0 || dir.skip) return null
-        if (lower.startsWith(".trashed-") || lower.startsWith(".pending-") || dir.trash) return if (size >= MIN_THUMB) Source.TRASH else null
-        if (dir.lost) return if (size >= MIN_THUMB) Source.LOST_DIR else null
+        if (AppAssets.isAssetFile(lower)) return null
+        if (lower.startsWith(".trashed-") || lower.startsWith(".pending-") || dir.trash) return if (size >= MIN_COMPLETE) Source.TRASH else null
+        if (dir.lost) return if (size >= MIN_COMPLETE) Source.LOST_DIR else null
         if (dir.thumbs || lower.startsWith(".thumbdata") || lower.startsWith("thumbdata")) return if (size >= MIN_THUMB) Source.THUMBNAILS else null
         if (ext in SKIP_EXT || lower == ".nomedia") return null
         val m = dir.messenger

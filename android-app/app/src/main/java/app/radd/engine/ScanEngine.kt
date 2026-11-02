@@ -39,7 +39,12 @@ sealed interface ScanEvent {
     data class Progress(val doneBytes: Long, val totalBytes: Long, val filesDone: Int, val filesTotal: Int, val path: String) : ScanEvent
     data class FoundOne(val item: Found) : ScanEvent
     data class StageDone(val source: Source, val found: Int) : ScanEvent
-    data class Finished(val found: Int, val visited: Long, val unreadable: Int, val stillVisible: Int, val warnings: List<String>) : ScanEvent
+    /** Comparing candidates with the photos the gallery still shows (can take a while on a big gallery). */
+    data class Comparing(val done: Int, val total: Int) : ScanEvent
+    /** [stillVisible]: copies of photos that still exist. [excluded]: too small, wrong shape, app assets and pictures that are not the user's. */
+    data class Finished(
+        val found: Int, val visited: Long, val unreadable: Int, val stillVisible: Int, val warnings: List<String>, val excluded: Int = 0,
+    ) : ScanEvent
 }
 
 /** Raised when nothing can be scanned at all (for example the storage permission was withdrawn). */
@@ -51,6 +56,7 @@ class ScanEngine(
     private val roots: StorageRoots,
     private val media: MediaGateway = NoMedia,
     private val decode: DecodeCheck = DecodeCheck { _, _, _, _ -> true },
+    private val fingerprinter: Fingerprinter = Fingerprints.none,
     private val zone: ZoneId = ZoneId.systemDefault(),
 ) {
     fun run(): Flow<ScanEvent> = channelFlow {
@@ -77,8 +83,7 @@ class ScanEngine(
         trashed.error?.let { warnings += "trash: $it" }
         val visible = media.visible()
         visible.error?.let { warnings += "gallery: $it" }
-        val visiblePaths = visible.rows.mapTo(HashSet()) { it.path }
-        val visibleBySize = visible.rows.groupBy { it.size }
+        val live = LiveIndex(visible.rows, fingerprinter) { done, total -> trySend(ScanEvent.Comparing(done, total)) }
         val knownTrash = index.getValue(Source.TRASH).mapTo(HashSet()) { it.file.path }
         for (row in trashed.rows) {
             val f = File(row.path)
@@ -91,9 +96,10 @@ class ScanEngine(
         var filesDone = 0
         var unreadable = 0
         var stillVisible = 0
+        var excluded = 0
         var total = 0
         val seenHashes = HashSet<String>()
-        val visibleHashes = HashMap<String, String>() // path -> sha, computed lazily
+        val listed = ArrayList<Pair<Fingerprint, Long>>()
         val counters = HashMap<Source, Int>()
         var lastProgress = 0L
 
@@ -103,7 +109,7 @@ class ScanEngine(
             var stageFound = 0
             for (c in list) {
                 currentCoroutineContext().ensureActive()
-                if (c.file.path in visiblePaths) { doneBytes += c.size; filesDone++; stillVisible++; continue }
+                if (live.hasPath(c.file.path)) { doneBytes += c.size; filesDone++; stillVisible++; continue }
                 try {
                     FileSource(c.file).use { src ->
                         val regions = Carvers.carve(src, c.deep, cancelled = { !stillAlive() }, onProgress = { b ->
@@ -114,11 +120,28 @@ class ScanEngine(
                             }
                         })
                         for (r in regions) {
-                            if (!acceptable(r, c.source)) continue
+                            if (!acceptable(r, c.source)) { excluded++; continue }
+                            if (PhotoRules.needsPhotoProof(c.source) && !PhotoRules.looksLikeUserPhoto(r, Exif.hasCameraTags(src, r))) { excluded++; continue }
                             if (!decode.ok(c.file, r.start, r.length, r.format)) continue
                             val sha = sha256(src, r.start, r.length)
                             if (!seenHashes.add(sha)) continue
-                            if (isStillVisible(r.length, sha, visibleBySize, visibleHashes)) { stillVisible++; continue }
+                            // the signature is needed for everything except a plain size check, so it is made once
+                            val fp = fingerprinter.of(c.file, r.start, r.length)
+                            if (c.source != Source.TRASH) {
+                                // a photo the user still has is not a deleted photo
+                                if (live.hasSameBytes(r.length, sha)) { stillVisible++; continue }
+                                if (fp != null) {
+                                    if (fp.flat) { excluded++; continue }
+                                    val tolerance = if (c.source == Source.THUMBNAILS) Fingerprints.THUMB_ASPECT_TOLERANCE else Fingerprints.ASPECT_TOLERANCE
+                                    if (live.hasSameScene(fp, tolerance)) { stillVisible++; continue }
+                                }
+                            }
+                            if (fp != null) {
+                                // a smaller copy (a thumbnail) of a photo that is already listed is the same photo, not a new one
+                                val pixels = r.width.toLong() * r.height
+                                if (listed.any { (other, otherPixels) -> otherPixels >= pixels && Fingerprints.sameScene(fp, other, Fingerprints.THUMB_ASPECT_TOLERANCE) }) continue
+                                listed += fp to pixels
+                            }
                             val n = (counters[c.source] ?: 0) + 1
                             counters[c.source] = n
                             val found = Found(
@@ -150,23 +173,10 @@ class ScanEngine(
             send(ScanEvent.Progress(doneBytes, totalBytes, filesDone, totalFiles, ""))
             send(ScanEvent.StageDone(stage, stageFound))
         }
-        send(ScanEvent.Finished(total, indexer.visited, unreadable + indexer.unreadableDirs, stillVisible, warnings))
+        send(ScanEvent.Finished(total, indexer.visited, unreadable + indexer.unreadableDirs, stillVisible, warnings, excluded))
     }.buffer(Channel.UNLIMITED)
 
-    private fun acceptable(r: Region, source: Source): Boolean {
-        val min = if (source == Source.THUMBNAILS) Classifier.MIN_THUMB else Classifier.MIN_COMPLETE
-        return if (r.complete) r.length >= min else r.length >= Classifier.MIN_PARTIAL
-    }
-
-    private fun isStillVisible(length: Long, sha: String, bySize: Map<Long, List<MediaRow>>, cache: MutableMap<String, String>): Boolean {
-        val same = bySize[length] ?: return false
-        for (row in same) {
-            val f = File(row.path)
-            val h = cache.getOrPut(row.path) { try { FileSource(f).use { sha256(it, 0, it.length) } } catch (_: Exception) { "" } }
-            if (h == sha) return true
-        }
-        return false
-    }
+    private fun acceptable(r: Region, source: Source): Boolean = PhotoRules.shape(r, source) == null
 
     /** Whole-file hits keep their own name (minus the trash prefix); carved hits get a neutral, unique name. */
     private fun nameFor(c: Candidate, r: Region, n: Int): String {

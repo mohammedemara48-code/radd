@@ -9,7 +9,7 @@ import app.radd.model.*
 sealed interface ScanState {
     data object Idle : ScanState
     data class Running(val progress: ScanProgress) : ScanState
-    data class Finished(val found: Int, val unreadable: Int, val stillVisible: Int, val warnings: List<String>) : ScanState
+    data class Finished(val found: Int, val unreadable: Int, val stillVisible: Int, val warnings: List<String>, val excluded: Int = 0) : ScanState
     data class Cancelled(val found: Int) : ScanState
     data class Failed(val reason: ScanFailure.Reason?, val message: String) : ScanState
 }
@@ -49,6 +49,7 @@ class ProgressTracker(private val startedMs: Long) {
                 while (latest.size > 5) latest.removeFirst()
             }
             is ScanEvent.StageDone -> stages = stages.map { if (it.source == e.source) it.copy(status = StageStatus.DONE, found = e.found) else it }
+            is ScanEvent.Comparing -> path = "بقارن مع صور المعرض (${e.done} من ${e.total})"
             is ScanEvent.Finished -> { percent = 1f; path = "" }
         }
     }
