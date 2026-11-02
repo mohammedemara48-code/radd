@@ -26,6 +26,7 @@ private val NightCard = Color(0xFF17201C)
 fun PhotoPreviewScreen(
     item: RecoverableItem, index: Int, total: Int, selected: Boolean, thumb: ThumbSlot,
     onClose: () -> Unit, onToggle: () -> Unit, onRestore: () -> Unit, modifier: Modifier = Modifier,
+    imageArea: (@Composable BoxScope.() -> Unit)? = null,
 ) {
     Column(modifier.fillMaxSize().background(Night)) {
         Row(Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -36,9 +37,13 @@ fun PhotoPreviewScreen(
             }
         }
         Box(Modifier.weight(1f).fillMaxWidth().padding(horizontal = 12.dp), contentAlignment = Alignment.Center) {
-            val ratio = item.width.toFloat() / item.height
-            Box(Modifier.fillMaxHeight().aspectRatio(ratio, matchHeightConstraintsFirst = true).clip(RoundedCornerShape(14.dp))) {
-                thumb(item, Modifier.fillMaxSize())
+            if (imageArea != null) {
+                imageArea()
+            } else {
+                val ratio = if (item.width > 0 && item.height > 0) item.width.toFloat() / item.height else 1f
+                Box(Modifier.fillMaxHeight().aspectRatio(ratio, matchHeightConstraintsFirst = true).clip(RoundedCornerShape(14.dp))) {
+                    thumb(item, Modifier.fillMaxSize())
+                }
             }
         }
         Surface(color = NightCard, shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp)) {
@@ -62,7 +67,7 @@ fun PhotoPreviewScreen(
                 }
                 Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                     Fact("الحجم", formatSize(item.sizeBytes), Modifier.weight(1f))
-                    Fact("الأبعاد", "${item.width}×${item.height}", Modifier.weight(1f), ltr = true)
+                    Fact("الأبعاد", if (item.width > 0) "${item.width}×${item.height}" else "—", Modifier.weight(1f), ltr = true)
                     Fact("التاريخ", formatDate(item.modifiedMs), Modifier.weight(1.3f))
                 }
                 Column(Modifier.fillMaxWidth().background(Color(0x14FFFFFF), RoundedCornerShape(12.dp)).padding(12.dp)) {

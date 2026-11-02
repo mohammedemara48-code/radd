@@ -27,7 +27,11 @@ data class RecoverableItem(
     val width: Int,
     val height: Int,
     val originPath: String,
-    val format: String = "JPEG",
+    val format: String = "jpg",
+    /** Where the bytes live: [length] bytes starting at [offset] inside [originPath]. */
+    val offset: Long = 0,
+    val length: Long = sizeBytes,
+    val sha256: String = "",
 )
 
 enum class SizeFilter(val label: String, val minBytes: Long, val maxBytes: Long) {

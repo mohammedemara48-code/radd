@@ -345,8 +345,9 @@ function HomeView({
 
         <div className="mt-6 flex flex-col gap-3 sm:flex-row">
           <a
-            href={`${assetBase}/radd.apk`}
-            download="radd.apk"
+            href="https://github.com/mohammedemara48-code/radd/releases/latest"
+            target="_blank"
+            rel="noreferrer"
             className="inline-flex min-h-11 items-center justify-center gap-2 rounded-full bg-accent px-5 text-sm font-medium text-bg"
           >
             <Download className="size-4" aria-hidden="true" />

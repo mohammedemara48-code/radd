@@ -16,6 +16,8 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -43,6 +45,9 @@ fun ResultsScreen(
     onClearSelection: () -> Unit,
     onRestore: () -> Unit,
     modifier: Modifier = Modifier,
+    onBack: () -> Unit = {},
+    scanning: Boolean = false,
+    onNewScan: () -> Unit = {},
 ) {
     val selecting = selected.isNotEmpty()
     val intact = all.count { it.quality == Quality.INTACT }
@@ -56,7 +61,7 @@ fun ResultsScreen(
             }
         } else {
             Row(Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
-                IconButton({}) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "رجوع") }
+                IconButton(onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "رجوع") }
                 Column(Modifier.weight(1f)) {
                     Text("${all.size} صورة قابلة للاسترجاع", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
                 }
@@ -87,10 +92,19 @@ fun ResultsScreen(
         }
         // Size / date / quality / sort
         LazyRow(contentPadding = PaddingValues(horizontal = 16.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            item { DropChip("الحجم", filters.size != SizeFilter.ANY, if (filters.size == SizeFilter.ANY) "أي حجم" else filters.size.label) }
-            item { DropChip("التاريخ", filters.date != DateFilter.ANY, if (filters.date == DateFilter.ANY) "أي وقت" else filters.date.label) }
-            item { DropChip("الحالة", filters.quality != QualityFilter.ALL, filters.quality.label) }
-            item { DropChip("ترتيب", false, filters.sort.label) }
+            item {
+                DropChip("الحجم", filters.size != SizeFilter.ANY, if (filters.size == SizeFilter.ANY) "أي حجم" else filters.size.label,
+                    SizeFilter.entries.map { it.label to { onFilters(filters.copy(size = it)) } })
+            }
+            item {
+                DropChip("التاريخ", filters.date != DateFilter.ANY, if (filters.date == DateFilter.ANY) "أي وقت" else filters.date.label,
+                    DateFilter.entries.map { it.label to { onFilters(filters.copy(date = it)) } })
+            }
+            item {
+                DropChip("الحالة", filters.quality != QualityFilter.ALL, filters.quality.label,
+                    QualityFilter.entries.map { it.label to { onFilters(filters.copy(quality = it)) } })
+            }
+            item { DropChip("ترتيب", false, filters.sort.label, SortOrder.entries.map { it.label to { onFilters(filters.copy(sort = it)) } }) }
         }
         }
         Row(Modifier.padding(horizontal = 20.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -98,6 +112,18 @@ fun ResultsScreen(
             if (filters.activeCount > 0) TextButton({ onFilters(Filters(sort = filters.sort)) }) { Text("مسح الفلاتر (${filters.activeCount})") }
         }
 
+        if (scanning) {
+            Text("الفحص لسه شغال، النتايج بتزيد. ", Modifier.padding(horizontal = 20.dp), style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary)
+        }
+        if (all.isEmpty()) {
+            EmptyState(
+                title = if (scanning) "لسه ملقيناش حاجة" else "مفيش صور اتلقت",
+                body = if (scanning) "الفحص شغال. أول ما يلاقي حاجة هتظهر هنا." else "ردّ مبيلاقيش غير اللي لسه ليه أثر (سلة المحذوفات، LOST.DIR، المصغّرات، كاش الشات). لو الصورة اتمسحت نهائي من غير أثر، مش هتظهر، وده حد من حدود التطبيق مش خطأ.",
+                actionLabel = if (scanning) null else "فحص جديد", onAction = onNewScan, modifier = Modifier.weight(1f),
+            )
+        } else if (shown.isEmpty()) {
+            EmptyState("مفيش نتايج بالفلاتر دي", "جرّب تمسح الفلاتر أو تغيّر الحجم أو التاريخ.", "مسح الفلاتر", { onFilters(Filters(sort = filters.sort)) }, Modifier.weight(1f))
+        } else
         // Grid
         LazyVerticalGrid(
             GridCells.Fixed(3), Modifier.weight(1f).fillMaxWidth(),
@@ -144,10 +170,16 @@ fun ResultsScreen(
 }
 
 @Composable
-private fun DropChip(label: String, active: Boolean, value: String) {
-    FilterChip(
-        selected = active, onClick = {},
-        label = { Text(if (active) "$label: $value" else "$label · $value") },
-        trailingIcon = { Icon(Icons.Filled.ArrowDropDown, null, Modifier.size(18.dp)) },
-    )
+private fun DropChip(label: String, active: Boolean, value: String, options: List<Pair<String, () -> Unit>>) {
+    var open by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(false) }
+    Box {
+        FilterChip(
+            selected = active, onClick = { open = true },
+            label = { Text(if (active) "$label: $value" else "$label · $value") },
+            trailingIcon = { Icon(Icons.Filled.ArrowDropDown, null, Modifier.size(18.dp)) },
+        )
+        DropdownMenu(open, { open = false }) {
+            options.forEach { (text, action) -> DropdownMenuItem(text = { Text(text) }, onClick = { open = false; action() }) }
+        }
+    }
 }

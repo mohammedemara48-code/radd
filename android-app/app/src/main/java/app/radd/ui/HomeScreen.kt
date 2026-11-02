@@ -26,7 +26,10 @@ data class PermissionUi(val allFilesGranted: Boolean, val mediaGranted: Boolean)
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-fun HomeScreen(permission: PermissionUi, onGrant: () -> Unit, onStart: () -> Unit, modifier: Modifier = Modifier) {
+fun HomeScreen(
+    permission: PermissionUi, onGrant: () -> Unit, onStart: () -> Unit, modifier: Modifier = Modifier,
+    previousCount: Int = 0, onShowPrevious: () -> Unit = {}, message: String? = null,
+) {
     Column(modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         // Header
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
@@ -72,9 +75,16 @@ fun HomeScreen(permission: PermissionUi, onGrant: () -> Unit, onStart: () -> Uni
                 }
             }
             Spacer(Modifier.height(12.dp))
+            if (message != null) {
+                Text(message, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(bottom = 8.dp))
+            }
             if (permission.ready) {
                 Button(onStart, Modifier.fillMaxWidth().height(52.dp)) {
                     Icon(Icons.Filled.Search, null); Spacer(Modifier.width(8.dp)); Text("ابدأ الفحص", style = MaterialTheme.typography.titleSmall)
+                }
+                if (previousCount > 0) {
+                    Spacer(Modifier.height(8.dp))
+                    OutlinedButton(onShowPrevious, Modifier.fillMaxWidth().height(48.dp)) { Text("نتايج آخر فحص ($previousCount)") }
                 }
             } else {
                 Button(onGrant, Modifier.fillMaxWidth().height(52.dp)) {
