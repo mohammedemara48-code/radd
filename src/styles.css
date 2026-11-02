@@ -1,0 +1,44 @@
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Readex Pro", "Segoe UI", "Noto Naskh Arabic", sans-serif;
+  --color-bg: #121614;
+  --color-surface: #1b2320;
+  --color-raised: #24302b;
+  --color-line: #31403a;
+  --color-fg: #e8f1eb;
+  --color-muted: #93a399;
+  --color-accent: #e0a15a;
+}
+
+@layer base {
+  html,
+  body {
+    background: var(--color-bg);
+    color: var(--color-fg);
+    font-family: var(--font-sans);
+  }
+
+  button:not(:disabled),
+  [role="button"]:not(:disabled) {
+    cursor: pointer;
+  }
+}
+
+@utility chiprow {
+  scrollbar-width: none;
+}
+
+.chiprow::-webkit-scrollbar {
+  display: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
